@@ -1,0 +1,553 @@
+#!/usr/bin/perl
+# author: seth
+# e-mail: for e-mail-address see http://www.wg-karlsruhe.de/seth/email_address.php
+# description: renames files or directories using regexps
+# thx to m. hoermann for utf8 support and some ideas of additional features
+#
+# tab-size: 2
+
+use strict;
+use warnings;
+use Cwd;
+#use Data::Dumper;
+
+sub syntaxCheck{
+	my @params = @_;
+	my @path_splitted = split /[\/\\]/, reverse $0;
+	my $prg_name = reverse $path_splitted[0];
+	my $version = '1.25.20130815';
+	my $syntax = 'syntax: '.$prg_name.' findRE replaceRE [options]';
+	my $usage = 'renames (recursively) files using regexps
+
+'.$syntax.'
+
+  findRE                 files to rename given by a regexp
+  replaceRE              how to rename, i.e., s/findRE/replaceRE/ in perl syntax
+  -c, --capitalize       Capitalize Every Word
+  -d, --directories      rename files and directories (default: files only)
+  -D, --Directories      rename directories only (default: files only)
+  -m, --mtime            use $y, $mon, $d in replaceRE to insert modification
+                          time
+  -p, --path             while searching use full paths of files in findRE
+                          (default: base filenames only)
+                          for the sake of intuition this options automatically 
+                          sets .*? as prefix and (?=[^\/]*\z) as suffix of
+                          findRE
+      --disable-auto     disables automatisms, i.e., 
+                          1. automatically generated prefixes and suffixes
+                             in findRE, when using --path, and
+                          2. escaping of unescaped slashes in findRE, filesRE,
+                             and replaceRE by backslashes
+  -r, --recursive        for searching subdirectories recursively
+  -t, --test             don\'t change anything, just print possible changes to
+                          screen
+  -u, --utf8             enable unicode support for input, output, and renaming
+  -y  --tr               use tr/findRE/replaceRE/ instead of s/findRE/replaceRE/
+  -F  --filesRE=s        restrict replacements to files given by regexp string s 
+                          (default s=".", i.e., all files)
+  -V, --version          display version and exit.
+      --examples         show some examples of using this tool
+
+force overwriting:
+  -p, --predictive=x     first look for possible overwriting or not...
+                          x=0: rename, but skip files, which would be
+                               overwritten, but shouldn\'t (depends on --force).
+                          x=1: don\'t even start renaming, if files would be 
+                               overwritten, that shouldn\'t (depends on --force).
+                               (default)
+  -f, --force            same as --force=1
+  -f, --force=x          grade of forcing renaming
+                          x=0: don\'t overwrite any files (default)
+                          x=1: overwrite existing (but not already renamed)
+                               files
+                          x=2: overwrite even renamed files
+regexp-modifiers:
+  -e, --emodifier        set e-modifier in RE, i.e., s/findRE/replaceRE/e
+                          (maybe you should consider using --disable-auto if you
+                           use slashes in replaceRE)
+                          (don\'t combine this with parameter --tr)
+  -g, --global           set g-modifier, i.e., rename as many times as possible,
+                          i.e., s/findRE/replaceRE/g
+                          (don\'t combine this with parameter --tr)
+  -i, --ignorecase       set i-modifier, i.e., ignore case in findRE, i.e., 
+                          s/findRE/replaceRE/i
+                          (don\'t combine this with parameter --tr)
+      --tr_c             use c-modifier (only if --tr is used), i.e., 
+                         complement findRE.
+      --tr_d             use d-modifier (only if --tr is used), i.e.,
+                          delete found but unreplaced characters.
+      --tr_s             use s-modifier (only if --tr is used), i.e.,
+                          squash duplicate replaced characters.
+verbosity:
+  -q, --silent           same as --verbose=0
+  -v, --verbose          same as --verbose=1 (default)
+  -vv,--very-verbose     same as --verbose=2
+  -v, --verbose=x        grade of verbosity
+                          x=0: no output
+                          x=1: default output
+                          x=2: much output
+
+examples: '.$prg_name.' "ASD" "asd"
+            replaces _first_ occurrence of "ASD" by "asd" in all files, e.g.
+            fooASDASD.txt -> fooasdASD (use -g for replacing all occurrences)'."\n".'
+          '.$prg_name.' --examples
+            shows more examples.'."\n";
+	my $examples ='
+'.$syntax.'
+
+examples: '.$prg_name.'
+            displays help'."\n".'
+          '.$prg_name.' "ASD" "asd"
+            replaces _first_ occurrence of "ASD" by "asd" in all files, e.g.
+            fooASDASD.txt -> fooasdASD'."\n".'
+          '.$prg_name.' "ASD" "asd" -g
+            replaces all occurrence of "ASD" by "asd" in all files, e.g.
+            fooASDASD.txt -> fooasdasd'."\n".'
+          '.$prg_name.' "(.)" "\u$1"
+            sets _first_ character to upper case (use -g for all)'."\n".'
+          '.$prg_name.' ".*cd(\d+)/([^/]+)$" "$1$2" --path -r
+            uses full path, i.e., renames ...cd01/title.ogg to
+            ...cd01/01title.ogg and so on (no files will be moved to another
+            directory)'."\n".'
+          '.$prg_name.' "(/d)(/d)" "$2$1" -gr
+            exchanges digits of numbers in all filenames recursively'."\n".'
+          '.$prg_name.' "(error_log\.)\d+(\.gz)" "$1$y-$mon-$d$2" --mtime
+            e.g. errog_log.10.gz -> error_log.2007-07-07.gz'."\n".'
+          '.$prg_name.' -rt _dir -dir
+            be careful and respect the parameter order.
+            this will replace "-rt" by "_dir" using parameters d, i, and r'."\n".'
+          '.$prg_name.' "foo(\d\d)" "\'bar\'.($1+42)" -ert
+            prints the result of replacing e.g. "foo10" by "bar52" recursively,
+            but doesn\'t really change filenames.'."\n".'
+          '.$prg_name.' "(\p{Cyrillic}+)" "\U$1" -drug
+            uppercase all cyrillic letters of files and directories in this 
+            directory and all subdirectories.'."\n".'
+          '.$prg_name.' "xy" "yx" --tr -F="foo_x=\d+_y=\d+"
+            use tr/xy/yx/ on all files that match /foo_x=\d+_y=\d+/, i.e., 
+            switch the letters "x" and "y" in all of those files.'."\n".'
+note that in linux you have to use single quotes instead of double quotes.
+alternatively you can mask the dollar-signs etc. '."\n";
+	my $version_info = 'ren_ext.pl '.$version."\n".'
+this program is distributed in the hope that it will be useful,
+but without any warranty; without even the implied warranty of
+merchantability or fitness for a particular purpose.'."\n".'
+originally written by seth (for e-mail-address see
+http://www.wg-karlsruhe.de/seth/email_address.php ).'."\n";
+	my $syntax_correct = 0;
+	my %param_hash;
+	# default values
+	$param_hash{'capitalize'} = 0;  # capitalize names
+	$param_hash{'directories'} = 0; # rename dirs
+	$param_hash{'emodifier'} = 0;   # s///e
+	$param_hash{'cmodifier'} = 0;   # y///c
+	$param_hash{'dmodifier'} = 0;   # y///d
+	$param_hash{'smodifier'} = 0;   # y///s
+	$param_hash{'auto'} = 1;        # automatisms
+	$param_hash{'examples'} = 0;    # diplay examples and exit
+	$param_hash{'files'} = 1;       # rename files
+	$param_hash{'filesRE'} = '.';   # RE for files to apply on
+	$param_hash{'force'} = 0;       # force; grade of forcing renaming
+	$param_hash{'fullpath'} = 0;    # use full path instead of filenames only
+	$param_hash{'global'} = 0;      # s///g
+	$param_hash{'ignorecase'} = 0;  # s///i
+	$param_hash{'mtime'} = 0;       # use modification time in replaceRE
+	$param_hash{'predictive'} = 1;  # predictive; look-ahead, and break before start, if necessary
+	$param_hash{'recursively'} = 0; # search subdirs
+	$param_hash{'test'} = 0;        # show result only (without renaming)
+	$param_hash{'tr'} = 0;          # tr/// instead of s///
+	$param_hash{'utf8'} = 0;        # interpret regexps and file names as unicode
+	$param_hash{'verbose'} = 1;     # trace; grade of verbosity
+	$param_hash{'version'} = 0;     # diplay version and exit
+	if(defined $params[1]){
+		$param_hash{'findRE'} = shift @params;
+		$param_hash{'replaceRE'} = shift @params;
+		$syntax_correct = (@params==0)? 1 : preparse_options(\@params);
+		my $v_counter = 0; # counter for -vv = -v -v = --very-verbose
+		for(@params){
+			if($_ eq '-c' || $_ eq '--capitalize'){
+				$param_hash{'capitalize'} = 1;
+				next;
+			}
+			if($_ eq '-d' || $_ eq '--directory'){
+				$param_hash{'directories'} = 1;
+				next;
+			}
+			if($_ eq '--disable-auto'){
+				$param_hash{'auto'} = 0;
+				next;
+			}
+			if($_ eq '--examples'){
+				$param_hash{'examples'} = 1;
+				next;
+			}
+			if($_ eq '-D' || $_ eq '--Directory'){
+				$param_hash{'directories'} = 1;
+				$param_hash{'files'} = 0;
+				next;
+			}
+			if($_=~/^-(?:F|-filesRE)=(.*)$/){
+				$param_hash{'filesRE'} = $1;
+				next;
+			}
+			if($_ eq '-m' || $_ eq '--mtime'){
+				$param_hash{'mtime'} = 1;
+				next;
+			}
+			if($_ eq '-p' || $_ eq '--path'){
+				$param_hash{'fullpath'} = 1;
+				next;
+			}
+			if($_ eq '-r' || $_=~/--recursive(?:ly)?/){
+				$param_hash{'recursively'} = 1;
+				next;
+			}
+			if($_ eq '-t' || $_ eq '--test'){
+				$param_hash{'test'} = 1;
+				next;
+			}
+			if($_ eq '-y' || $_ eq '--tr'){
+				$param_hash{'tr'} = 1;
+				next;
+			}
+			# unicode
+			if($_ eq '-u' || $_ eq '--utf8'){
+				$param_hash{'utf8'} = 1;
+				next;
+			}
+			if($_ eq '-V' || $_ eq '--version'){
+				$param_hash{'version'} = 1;
+				next;
+			}
+			# force overwriting
+			if($_=~/^-(?:p[= ]?|-predictive=)([01])$/){
+				$param_hash{'predictive'} = $1;
+				next;
+			}
+			if($_ eq '-f' || $_ eq '--force'){
+				$param_hash{'force'} = 1;
+				next;
+			}
+			if($_=~/^-(?:f[= ]?|-force=)([012])$/){
+				$param_hash{'force'} = $1;
+				next;
+			}
+			# modifiers
+			if($_ eq '-e' || $_ eq '--emodifier'){
+				$param_hash{'emodifier'} = 1;
+				next;
+			}
+			if($_ eq '-g' || $_ eq '--global'){
+				$param_hash{'global'} = 1;
+				next;
+			}
+			if($_ eq '-i' || $_ eq '--ignorecase'){
+				$param_hash{'ignorecase'} = 1;
+				next;
+			}
+			if($_ eq '--tr_c'){
+				$param_hash{'cmodifier'} = 1;
+				next;
+			}
+			if($_ eq '--tr_d'){
+				$param_hash{'dmodifier'} = 1;
+				next;
+			}
+			if($_ eq '--tr_s'){
+				$param_hash{'smodifier'} = 1;
+				next;
+			}
+			# verbosity
+			if($_ eq '-q' || $_ eq '--silent'){
+				$param_hash{'verbose'} = 0;
+				next;
+			}
+			if($_=~/^-(?:v|-verbose)$/){
+				$param_hash{'verbose'} = ++$v_counter;
+				next;
+			}
+			if($_=~/^--very-verbose$/){
+				$param_hash{'verbose'} = 2;
+				next;
+			}
+			if($_=~/^-(?:v[= ]?|-verbose=)([012])$/){
+				$param_hash{'verbose'} = $1;
+				next;
+			} # else
+			$syntax_correct = 0;
+			last;
+		}
+		# check for unvalid combinations
+		if(      $param_hash{'tr'} 
+					&& ($param_hash{'emodifier'} || $param_hash{'global'} || $param_hash{'ignorecase'})
+			 ||   !$param_hash{'tr'}
+					&& ($param_hash{'cmodifier'} || $param_hash{'dmodifier'} || $param_hash{'smodifier'})
+			){
+			die " error: don\'t mix up the modifiers. use s///eig or tr///cds. see help: $prg_name --help\n";
+		}
+	}
+	if(    $param_hash{'version'}
+			|| (defined($params[0]) && !defined($params[1]) && $params[0] =~ '^(-V|--version)$')){
+		die $version_info;
+	}elsif($param_hash{'examples'}
+			|| (defined($params[0]) && !defined($params[1]) && $params[0] eq '--examples')){
+		die $examples;
+	}else{
+		$syntax_correct || die $usage;
+	}
+	return %param_hash;
+}
+
+sub preparse_options{
+	# yeah, i know that at CPAN there already exist many get-opt-modules.
+	my $unparsed_params = shift;
+	my @params = ();
+	my $l = '[a-zA-Z]';           # leading char of long param      (--Xooo)
+	my $n = '[a-zA-Z_-]';         # non-leading char of long param  (--oXXX)
+	my $p = '.';                  # param of param                  (--oooo=X or -o=X)
+	my $s = '[a-zA-Z]';           # short params                    (-X)
+	my $waiting_for_param_param = 0;
+	my $syntax_check = 1;
+	my $param_param;
+	for my $param (@$unparsed_params){
+		if($param =~ /^--$l$n+(?:=$p+)?\z/){  # long param
+			push @params, $param;
+			$waiting_for_param_param = 0;
+		}elsif($param =~ /-($s*)($s=$p+)\z/){ # short param with param
+			$param_param = $2;
+			push @params, grep s/^/-/, split /(?=$s)/, $1;
+			push @params, '-'.$param_param;
+			$waiting_for_param_param = 0;
+		}elsif($param =~ /-$s+\z/){          # short param w/o param
+			push @params, grep s/^/-/, split /(?=$s)/, substr($param, 1);
+			$waiting_for_param_param = 1;
+		}elsif($waiting_for_param_param==1){  # separated param of param
+			$params[$#params].='='.$param;
+			$waiting_for_param_param = 0;
+		}else{
+			$syntax_check = 0;
+			last;
+		}
+	}
+	@{$unparsed_params} = @params;
+	return $syntax_check;
+}
+
+sub capitalize{
+	my $s = shift;
+	$s = lc $s;
+	$s=~s/\b(\w)/\u$1/g;     # capitalize all words
+	$s=~s/\.(\w+)\z/.\l$1/g; # decapitalize file-extension
+	return $s;
+}
+
+sub get_time_of_entry{
+	my $file = shift;
+	my $file_stat = (stat $file)[9];
+	my @filetime  = localtime $file_stat;
+	my $year  = sprintf "%04u", $filetime[5]+1900;
+	my $month = sprintf "%02u", $filetime[4]+1;
+	my $day   = sprintf "%02u", $filetime[3];
+	return ($year, $month, $day);
+}
+
+sub decode_utf8{
+	my $bytes = shift;
+	utf8::decode($$bytes)
+		or die 'invalid utf-8 encountered (try omitting option -u or --utf8 respectively)';
+	return;
+}
+
+sub generate_searchreplace_string{
+	my $params = shift;
+	return ''.($$params{'tr'} ? 'tr' : 's').'/'.$$params{'findRE'}.'/'.$$params{'replaceRE'}.'/'.$$params{'emodifier'}.$$params{'ignorecase'}.$$params{'global'}.$$params{'cmodifier'}.$$params{'dmodifier'}.$$params{'smodifier'};
+}
+
+sub is_win{
+	return $^O=~/win/i;
+}
+
+sub get_fullpath{
+	my $filename = shift;
+	my $fullpath = Cwd::abs_path($filename);
+	$fullpath=~s/\//\\/g if(-d $filename && is_win());
+	return $fullpath;
+}
+
+sub check_target_filename{
+	my $filename = shift;
+	if($filename=~/\\/ && is_win() || $filename=~/\//){
+		my $output = shift;
+		my $params = shift;
+		print "error: operation not allowed!\n";
+		print ' '.$output."\"\n";
+		print ' slashes "/" (and in windows backslashes "\", too) are not allowed in target filenames'."\n";
+		print ' files can be renamed only, they can\'t be moved to other directories with this tool.'."\n";
+		print " findRE or replaceRE seem to be unvalid!.\n";
+		if($$params{'fullpath'} && $$params{'findRE'}!~/\^?\.\*/){
+			print ' maybe you want to try'."\n";
+			print '  findRE = .*'.$$params{'findRE'}."\n";
+		}
+		die 'program aborted.';
+	}
+	return;
+}
+
+sub rename_files_addon{
+	my $working_dir = shift;
+	my $overwrite   = shift;
+	my $params      = shift;
+	my $findRE      = $$params{'findRE'};
+	my $filesRE     = $$params{'filesRE'};
+	my $replaceRE   = $$params{'replaceRE'};
+	my $ren_dirs    = $$params{'directories'};
+	my $ren_files   = $$params{'files'};
+	my $capitalize  = $$params{'capitalize'};
+	my $mtime       = $$params{'mtime'};
+	my $recursively = $$params{'recursively'};
+	my $test        = $$params{'test'};
+	my $tr          = $$params{'tr'};
+	my $force       = $$params{'force'};
+	my $fullpath    = $$params{'fullpath'};
+	my $ignorecase  = $$params{'ignorecase'};
+	my $prediction  = $$params{'prediction'};
+	my $utf8        = $$params{'utf8'};
+	my $verbose     = $$params{'verbose'};
+	my $output;
+	my $entry;
+	my $entry_filename;
+	my $exists;
+	my @entries_to_rename;
+	my $need_force;
+	my @renamed_entries;
+	my @dirs;
+	my $searchreplace_string = generate_searchreplace_string($params);
+	print "\n".'  '.$working_dir.'/'."\n" if $verbose>1;
+	opendir(DIR, ".") or die $working_dir.": $!"; # read_dir and generate renaming_array
+	while($entry_filename=readdir DIR){           # loop over directory entries
+		next if($entry_filename eq '.' || $entry_filename eq '..');
+		decode_utf8(\$entry_filename) if $utf8;
+		push(@dirs, $entry_filename) if -d $entry_filename;
+		if($fullpath){
+			$entry = get_fullpath($entry_filename);
+			decode_utf8(\$entry) if $utf8; 
+		}else{
+			$entry = $entry_filename;
+		}
+		if((($ren_dirs && -d $entry_filename) || ($ren_files && not -d $entry_filename)) 
+		  && $entry=~/$filesRE/ 
+		  &&( $tr
+		    || !$tr
+		    &&( ($ignorecase eq ''  && $entry=~/$findRE/) 
+		      ||($ignorecase eq 'i' && $entry=~/$findRE/i)
+			    )
+			  )
+			){                                        # if entry should be renamed
+			my ($y, $mon, $d) = get_time_of_entry($entry_filename) if $mtime==1;
+			print "\n".'  '.$working_dir.'/'."\n" if $verbose==1 && @entries_to_rename==0;
+			$output = 'rename: "'.$entry_filename;
+			print "'$entry'=~$searchreplace_string\n" if $verbose>2;
+			push(@entries_to_rename, $entry_filename);
+			eval('$entry=~'.$searchreplace_string);   # generate new file name
+			#$entry = substr $entry, length($`) if($fullpath && (!is_win() && -1<index($`, '/') || is_win() && -1<index($`, '\\')));
+			$entry = capitalize($entry) if $capitalize;
+			$output .= '" ==> "'.$entry;
+			check_target_filename($entry, $output, $params);
+			$need_force = 0;
+			# check for collisions
+			if((!is_win() && grep {$_ eq $entry} @renamed_entries)
+				|| (is_win() && grep {lc $_ eq lc($entry)} @renamed_entries)
+				){                                      # if another file was already renamed to the same name
+				++$$overwrite{'newfiles'};
+				$output .= ' (another file '.(($force>1)? 'will' : 'would').' be renamed to this name already!)';
+				$need_force = 2;
+			}
+			if(-e $entry){                            # target file exists already
+				if($entry eq $entries_to_rename[-1]){   # old_name == new_name
+					$output .= ' (name unchanged)';
+				}elsif(is_win() && lc $entry eq lc $entries_to_rename[-1]){
+					$output .= ' (changing case only)';   # case-change (win-only)
+				}else{
+					++$$overwrite{'existingfiles'};       # overwrite existing file?
+					$output .= ' (existing already! '.(($force>0)? 'will' : 'won\'t').' be overwritten.)';
+					$need_force = 1 if $need_force<1;
+				}
+			}
+			unless(-e $entry && $entry eq $entries_to_rename[-1] && $tr){
+				print $output."\"\n" if $verbose>0 && ($prediction==0 || $need_force>0) || $verbose>1;
+			}
+			if($force>=$need_force){
+				push @renamed_entries, $entry;
+			}else{
+				pop @entries_to_rename;
+			}
+		}else{
+			print 'skip: '.$entry."\n" if $verbose>1;
+		}
+	}
+	closedir DIR;
+	@dirs = sort @dirs;
+	if($recursively==1){ # first search subdirectories
+		for(@dirs){
+			chdir $_;
+			rename_files_addon($working_dir.'/'.$_, $overwrite, $params);
+			chdir '..';
+		}
+	}
+	if(!$test && !$prediction){ # after searching subdirectories begin renaming
+		for(my $i=0; $i<@entries_to_rename; ++$i){
+			rename $entries_to_rename[$i], $renamed_entries[$i];
+		}
+	}
+	return;
+}
+
+sub rename_files_using_regexps{
+	my %params = syntaxCheck(@_);
+	# postprocess params
+	if($params{'auto'}){
+		# escape unescaped slashes
+		$params{$_}=~s/(?<!\\)((?:\\\\)*)\//$1\\\//g for('findRE', 'replaceRE', 'filesRE');
+		# add prefix and suffix to findRE for intuitive fullpath searching
+		$params{findRE} = '.*?'.$params{findRE}.'(?=[^\/]*\z)' if $params{'fullpath'};
+	}
+	if($params{'utf8'}){
+		# enable unicode for both regular expressions ...
+		decode_utf8(\$params{$_})	for('findRE', 'replaceRE', 'filesRE');
+		# ... and for the screen output
+		binmode(STDOUT, ':utf8');
+		binmode(STDERR, ':utf8');
+	}
+	# bool2modifier 
+	$params{'cmodifier'}  = ($params{'cmodifier'}) ? 'c' : '';
+	$params{'dmodifier'}  = ($params{'dmodifier'}) ? 'd' : '';
+	$params{'emodifier'}  = ($params{'emodifier'}) ? 'e' : '';
+	$params{'smodifier'}  = ($params{'smodifier'}) ? 's' : '';
+	$params{'global'}     = ($params{'global'}) ? 'g' : '';
+	$params{'ignorecase'} = ($params{'ignorecase'}) ? 'i' : '';
+
+	my $working_dir = cwd;
+	decode_utf8(\$working_dir) if $params{'utf8'};
+	my %overwrite; # counting of overwritten files
+	$overwrite{'existingfiles'} = 0;
+	$overwrite{'newfiles'} = 0;
+	print ' using '.generate_searchreplace_string(\%params)."\n" if $params{'verbose'}>0;
+	if($params{'test'}==0 && $params{'predictive'}==1){        # if not just testing, predict collisions
+		print 'predicting changes/collisions...'."\n" if $params{'verbose'}>0;
+		$params{'prediction'} = 1;
+		rename_files_addon($working_dir, \%overwrite, \%params);
+		print 'number of collisions: '.($overwrite{'existingfiles'}+$overwrite{'newfiles'})."\n" if $params{'verbose'}>1;
+	}
+	if($params{'force'}==0 and $overwrite{'existingfiles'}+$overwrite{'newfiles'}==0 or
+		$params{'force'}==1 and $overwrite{'newfiles'}==0 or
+		$params{'force'}==2){ # call renaming-routine
+		print $params{'test'} ? "\ntesting...\n": "\nrenaming...\n" if $params{'verbose'}>0;
+		$params{'prediction'} = 0;
+		rename_files_addon($working_dir, \%overwrite, \%params);
+	}elsif($params{'verbose'}>0){
+		print $overwrite{'existingfiles'}.' existing and '.$overwrite{'newfiles'}.' new files would be overwritten.'."\n";
+	}
+	chdir $working_dir;
+	return;
+}
+
+rename_files_using_regexps(@ARGV);
