@@ -264,48 +264,48 @@ sub rename_files_addon{
 }
 
 sub rename_files_using_regexps{
-	my %params = syntaxCheck(@_);
+	my $params = syntaxCheck(@_);
 	# postprocess params
-	if($params{'auto'}){
+	if($params->{'auto'}){
 		# escape unescaped slashes
-		$params{$_}=~s/(?<!\\)((?:\\\\)*)\//$1\\\//g for('findRE', 'replaceRE', 'filesRE');
+		$params->{$_}=~s/(?<!\\)((?:\\\\)*)\//$1\\\//g for('findRE', 'replaceRE', 'filesRE');
 		# add prefix and suffix to findRE for intuitive fullpath searching
-		$params{findRE} = '.*?'.$params{findRE}.'(?=[^\/]*\z)' if $params{'path'};
+		$params->{findRE} = '.*?'.$params->{findRE}.'(?=[^\/]*\z)' if $params->{'path'};
 	}
-	if($params{'utf8'}){
+	if($params->{'utf8'}){
 		# enable unicode for both regular expressions ...
-		decode_utf8(\$params{$_})	for('findRE', 'replaceRE', 'filesRE');
+		decode_utf8(\$params->{$_})	for('findRE', 'replaceRE', 'filesRE');
 		# ... and for the screen output
 		binmode(STDOUT, ':utf8');
 		binmode(STDERR, ':utf8');
 	}
 	# bool2modifier 
-	$params{'cmodifier'}  = ($params{'cmodifier'}) ? 'c' : '';
-	$params{'dmodifier'}  = ($params{'dmodifier'}) ? 'd' : '';
-	$params{'emodifier'}  = ($params{'emodifier'}) ? 'e' : '';
-	$params{'smodifier'}  = ($params{'smodifier'}) ? 's' : '';
-	$params{'global'}     = ($params{'global'}) ? 'g' : '';
-	$params{'ignorecase'} = ($params{'ignorecase'}) ? 'i' : '';
+	$params->{'cmodifier'}  = ($params->{'cmodifier'}) ? 'c' : '';
+	$params->{'dmodifier'}  = ($params->{'dmodifier'}) ? 'd' : '';
+	$params->{'emodifier'}  = ($params->{'emodifier'}) ? 'e' : '';
+	$params->{'smodifier'}  = ($params->{'smodifier'}) ? 's' : '';
+	$params->{'global'}     = ($params->{'global'}) ? 'g' : '';
+	$params->{'ignorecase'} = ($params->{'ignorecase'}) ? 'i' : '';
 
 	my $working_dir = cwd;
-	decode_utf8(\$working_dir) if $params{'utf8'};
+	decode_utf8(\$working_dir) if $params->{'utf8'};
 	my %overwrite; # counting of overwritten files
 	$overwrite{'existingfiles'} = 0;
 	$overwrite{'newfiles'} = 0;
-	print ' using '.generate_searchreplace_string(\%params)."\n" if $params{'verbose'}>0;
-	if($params{'test'}==0 && $params{'predictive'}==1){        # if not just testing, predict collisions
-		print 'predicting changes/collisions...'."\n" if $params{'verbose'}>0;
-		$params{'prediction'} = 1;
-		rename_files_addon($working_dir, \%overwrite, \%params);
-		print 'number of collisions: '.($overwrite{'existingfiles'}+$overwrite{'newfiles'})."\n" if $params{'verbose'}>1;
+	print ' using '.generate_searchreplace_string($params)."\n" if $params->{'verbose'}>0;
+	if($params->{'test'}==0 && $params->{'predictive'}==1){        # if not just testing, predict collisions
+		print 'predicting changes/collisions...'."\n" if $params->{'verbose'}>0;
+		$params->{'prediction'} = 1;
+		rename_files_addon($working_dir, \%overwrite, $params);
+		print 'number of collisions: '.($overwrite{'existingfiles'}+$overwrite{'newfiles'})."\n" if $params->{'verbose'}>1;
 	}
-	if($params{'force'}==0 and $overwrite{'existingfiles'}+$overwrite{'newfiles'}==0 or
-		$params{'force'}==1 and $overwrite{'newfiles'}==0 or
-		$params{'force'}==2){ # call renaming-routine
-		print $params{'test'} ? "\ntesting...\n": "\nrenaming...\n" if $params{'verbose'}>0;
-		$params{'prediction'} = 0;
-		rename_files_addon($working_dir, \%overwrite, \%params);
-	}elsif($params{'verbose'}>0){
+	if($params->{'force'}==0 and $overwrite{'existingfiles'}+$overwrite{'newfiles'}==0 or
+		$params->{'force'}==1 and $overwrite{'newfiles'}==0 or
+		$params->{'force'}==2){ # call renaming-routine
+		print $params->{'test'} ? "\ntesting...\n": "\nrenaming...\n" if $params->{'verbose'}>0;
+		$params->{'prediction'} = 0;
+		rename_files_addon($working_dir, \%overwrite, $params);
+	}elsif($params->{'verbose'}>0){
 		print $overwrite{'existingfiles'}.' existing and '.$overwrite{'newfiles'}.' new files would be overwritten.'."\n";
 	}
 	chdir $working_dir;
