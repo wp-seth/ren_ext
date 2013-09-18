@@ -11,9 +11,9 @@ use warnings;
 use Cwd;
 use Getopt::Long qw(:config bundling);
 use Pod::Usage;
-#use Data::Dumper;
+use Data::Dumper;
 
-$main::VERSION = '1.26.20130817';
+$main::VERSION = '1.27.20130918';
 
 sub syntaxCheck{
 	my %params = ( # default cli params
@@ -55,7 +55,7 @@ sub syntaxCheck{
 		"smodifier|tr_s",
 		"examples",
 		"mtime|m",
-		"path|p",
+		"path",
 		"predictive|p=i" => sub { pod2usage(-exitval=>2) if $_ !~ /^[01]$/;},
 		"recursive|r",
 		"test|t",
@@ -341,7 +341,7 @@ ren_ext [options] findRE replaceRE
   -D, --Directories      rename directories only (default: files only)
   -m, --mtime            use $y, $mon, $d in replaceRE to insert modification
                           time
-  -p, --path             while searching use full paths of files in findRE
+      --path             while searching use full paths of files in findRE
                           (default: base filenames only)
                           for the sake of intuition this options automatically 
                           sets .*? as prefix and (?=[^\/]*\z) as suffix of
@@ -420,16 +420,26 @@ some examples:
 ren_ext
   displays help
 
-ren_ext 'ASD' 'asd'
-  replaces _first_ occurrence of "ASD" by "asd" in all files, e.g.
-  fooASDASD.txt -> fooasdASD
+ren_ext 'ASD' 'sdf'
+  replaces _first_ occurrence of "ASD" by "sdf" in all files, e.g.
+  fooASDASD.txt -> foosdfASD
 
-ren_ext 'ASD' 'asd' -g
-  replaces all occurrence of 'ASD' by 'asd' in all files, e.g.
-  fooASDASD.txt -> fooasdasd
+ren_ext 'ASD' 'sdf' -g
+  replaces all occurrence of 'ASD' by 'sdf' in all files, e.g.
+  fooASDASD.txt -> foosdfsdf
 
 ren_ext '(.)' '\u$1'
-  sets _first_ character to upper case (use -g for all)
+  sets _first_ character to upper case
+
+ren_ext '(.)' '\l$1' -g
+  sets all characters to lower case
+
+ren_ext '[A-Z]' '[a-z]' -y
+  sets all latin characters to lower case
+
+ren_ext '(\p{Cyrillic}+)' '\U$1' -drug
+  uppercase all cyrillic letters of files and directories in this 
+  directory and all subdirectories
 
 ren_ext '.*cd(\d+)/([^/]+)$' '$1$2' --path -r
   uses full path, i.e., renames ...cd01/title.ogg to
@@ -448,10 +458,6 @@ ren_ext -r -- -foo -bar
 ren_ext 'foo(\d\d)' '"bar".($1+42)' -ert
   prints the result of replacing e.g. 'foo10' by 'bar52' recursively,
   but doesn't really change filenames
-
-ren_ext '(\p{Cyrillic}+)' '\U$1' -drug
-  uppercase all cyrillic letters of files and directories in this 
-  directory and all subdirectories
 
 ren_ext 'xy' 'yx' --tr -F 'foo_x=\d+_y=\d+'
   use tr/xy/yx/ on all files that match /foo_x=\d+_y=\d+/, i.e., 
@@ -493,7 +499,7 @@ restrict replacements to files given by regexp I<string> (default ".", i.e., all
 
 use $y, $mon, $d in B<replaceRE> to insert modification time
 
-=item B<--path>, B<-p>
+=item B<--path>
 
 while searching use full paths of files/directories in B<findRE> (default: base 
 filenames only).
