@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+e#!/usr/bin/perl
 # author: seth
 # e-mail: for e-mail-address see http://www.wg-karlsruhe.de/seth/email_address.php
 # description: renames files or directories using regexps
@@ -61,7 +61,6 @@ sub syntaxCheck{
 		"test|t",
 		"tr|y",
 		"utf8|u",
-		"editor=s" => sub { $params{'editors'} = $_[1].'|'.$params{'editors'};},
 		"silent|quiet|q" => sub { $params{'verbose'} = 0;},
 		"very-verbose" => sub { $params{'verbose'} = 2;},
 		"verbose|v:+",
