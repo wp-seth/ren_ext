@@ -359,7 +359,7 @@ regexps.
 
 =head1 DESCRIPTION
 
-this program lets you renames files or directories by using regular expressions. 
+this program lets you rename files or directories by using regular expressions. 
 
 it includes a check, whether a target filename already exists or whether several 
 target filenames are same, and prints a warning in such cases.
