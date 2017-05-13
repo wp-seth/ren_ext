@@ -3,18 +3,16 @@
 # contact: see https://github.com/wp-seth/ren_ext
 # description: renames files or directories using regexps
 # thx to m. hoermann for utf8 support and some ideas of additional features
-#
-# tab-size: 2
 
 use strict;
 use warnings;
 use Cwd;
+use Data::Dumper;
 use Getopt::Long qw(:config bundling);
 use Pod::Usage;
-use Data::Dumper;
 #use utf8;
 
-$main::VERSION = '1.29.20141224';
+$main::VERSION = '1.30.0'; # 20170513
 #binmode STDOUT, ":utf8";
 
 # functions
@@ -70,37 +68,46 @@ sub syntaxCheck{
 		'version'     => 0,   # diplay version and exit
 	);
 	GetOptions(\%params,
-		"auto!",
-		"capitalize|c",
-		"directories|d",
-		"Directories|D" => sub { $params{'directories'} = 1; $params{'files'} = 0;},
-		"filesRE|F=s",
-		"force|f:i" => sub { $params{'force'} = not defined $_[1] ? 1 : $_[1];},
-		"emodifier|e",
-		"global|gmodifier|g",
-		"ignorecase|imodifier|i",
-		"cmodifier|tr_c",
-		"dmodifier|tr_d",
-		"smodifier|tr_s",
-		"examples",
-		"mtime|m",
-		"path",
-		"predictive|p=i" => sub { 
+		'auto!',
+		'capitalize|c',
+		'directories|d',
+		'Directories|D' => sub { $params{'directories'} = 1; $params{'files'} = 0;},
+		'filesRE|F=s',
+		'force|f:i' => sub { $params{'force'} = not defined $_[1] ? 1 : $_[1];},
+		'emodifier|e',
+		'global|gmodifier|g',
+		'ignorecase|imodifier|i',
+		'cmodifier|tr_c',
+		'dmodifier|tr_d',
+		'smodifier|tr_s',
+		'examples',
+		'mtime|m',
+		'path',
+		'predictive|p=i' => sub { 
 			pod2usage(-exitval=>2) if $_[1] !~ /^[01]$/; 
 			$params{'predictive'} = $_[1];
 		},
-		"recursive|r",
-		"test|t",
-		"tr|y",
-		"utf8|u",
-		"silent|quiet|q" => sub { $params{'verbose'} = 0;},
-		"very-verbose" => sub { $params{'verbose'} = 2;},
-		"verbose|v:+",
-		"version|V" => sub { Getopt::Long::VersionMessage();}, # auto_version will not auto make use of 'V'
-		"help|?|h" => sub { Getopt::Long::HelpMessage(-verbose=>99, -sections=>"NAME|SYNOPSIS");}, # auto_help will not auto make use of 'h'
-		"man" => sub { pod2usage(-exitval=>0, -verbose=>2);},
-		"examples" => sub { Getopt::Long::HelpMessage(-verbose=>99, -sections=>"EXAMPLES");},
-	) or pod2usage(-exitval=>2);
+		'recursive|r',
+		'test|t',
+		'tr|y',
+		'utf8|u',
+		'silent|quiet|q' => sub { $params{'verbose'} = 0;},
+		'very-verbose' => sub { $params{'verbose'} = 2;},
+		'verbose|v:+',
+		# auto_version will not auto make use of 'V'
+		'version|V' => sub { Getopt::Long::VersionMessage();},
+		# auto_help will not auto make use of 'h'
+		'help|?|h' => sub { Getopt::Long::HelpMessage(
+				-verbose  => 99,
+				-sections => 'NAME|SYNOPSIS'
+			);
+		},
+		'man' => sub { pod2usage(-exitval => 0, -verbose => 2);},
+		'examples' => sub { Getopt::Long::HelpMessage(
+				-verbose => 99, -sections => 'EXAMPLES'
+			);
+		},
+	) or pod2usage(-exitval => 2);
 	$params{'verbose'} = 1 unless exists $params{'verbose'};
 	# check for unvalid combinations
 	if(      $params{'tr'} 
@@ -111,14 +118,20 @@ sub syntaxCheck{
 		die " error: don't mix up the modifiers. use s///eig or tr///cds. see help: ren_ext --help\n";
 	}
 	# additional params
-	my @additional_params = (2,2); # number of additional params (min, max);
-	if(@ARGV<$additional_params[0] or ($additional_params[1]!=-1 and @ARGV>$additional_params[1])){
-		if($additional_params[0]==$additional_params[1]){
-			print "number of arguments must be exactly $additional_params[0], but is ".(0+@ARGV).".\n";
+	my @additional_params = (2, 2); # number of additional params (min, max);
+	if(@ARGV < $additional_params[0] or
+		($additional_params[1] != -1 and @ARGV > $additional_params[1])
+	){
+		if($additional_params[0] == $additional_params[1]){
+			print "error: number of arguments must be exactly $additional_params[0]," . 
+				' but is ' . (0 + @ARGV) . ".\n";
 		}else{
-			print "number of arguments must be at least $additional_params[0] and at most ".($additional_params[1] == -1 ? 'inf' : $additional_params[1]).", but is ".(0+@ARGV).".\n";
+			print "error: number of arguments must be at least $additional_params[0]" .
+				' and at most ' .
+				($additional_params[1] == -1 ? 'inf' : $additional_params[1]) .
+				", but is " . (0 + @ARGV) . ".\n";
 		}
-		pod2usage(-exitval=>2);
+		pod2usage(-exitval => 2);
 	}
 	$params{'findRE'} = $ARGV[0];
 	$params{'replaceRE'} = $ARGV[1];
@@ -359,7 +372,7 @@ regexps.
 
 =head1 DESCRIPTION
 
-this program lets you renames files or directories by using regular expressions. 
+this program lets you rename files or directories by using regular expressions. 
 
 it includes a check, whether a target filename already exists or whether several 
 target filenames are same, and prints a warning in such cases.
@@ -436,8 +449,8 @@ meta:
   -h, --help             display brief help
       --man              display long help (man page)
   -q, --silent           same as --verbose=0
-  -v, --verbose          same as --verbose=1 (default)
-  -vv,--very-verbose     same as --verbose=2
+  -v, --verbose          same as --verbose=2
+  -vv,--very-verbose     same as --verbose=3
   -v, --verbose=x        grade of verbosity
                           x=0: no output
                           x=1: default output
@@ -664,17 +677,19 @@ same as B<--verbose=0>.
 
 =item B<--very-verbose, -vv>
 
-same as B<--verbose=2>. you may use B<-vvv> for B<--verbose=3> a.s.o.
+same as B<--verbose=3>. you may use B<-vvv> for B<--verbose=4> a.s.o.
 
 =item B<--verbose, -v>
 
-same as B<--verbose=1>.
+same as B<--verbose=2>.
 
 =back
 
 =head1 LICENCE
 
-Copyright (c) 2014, seth
+BSD-2-Clause
+
+Copyright (c) 2014-2017, seth
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

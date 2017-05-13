@@ -5,7 +5,7 @@ regexps.
 
 =head1 DESCRIPTION
 
-this program lets you renames files or directories by using regular expressions. 
+this program lets you rename files or directories by using regular expressions. 
 
 it includes a check, whether a target filename already exists or whether several 
 target filenames are same, and prints a warning in such cases.
@@ -43,12 +43,13 @@ ren_ext [options] findRE replaceRE
 
 force overwriting:
 
-  -p, --predictive=x     first look for possible overwriting or not...
-                          x=0: rename, but skip files, which would be
-                               overwritten, but shouldn't (depends on --force).
-                          x=1: don't even start renaming, if files would be 
-                               overwritten, that shouldn't (depends on --force).
-                               (default)
+  -p, --predictive=x     (don't) look for possible overwriting first ...
+                          x=0: start renaming, but skip those files that would 
+                               overwrite other files that shouldn't be 
+                               overwritten (depends on --force).
+                          x=1: don't even start renaming of any file, if one
+                               file would be overwritten that shouldn't be 
+                               overwritten (depends on --force). (default)
   -f, --force            same as --force=1
   -f, --force=x          grade of forcing renaming
                           x=0: don't overwrite any files (default)
@@ -81,8 +82,8 @@ meta:
   -h, --help             display brief help
       --man              display long help (man page)
   -q, --silent           same as --verbose=0
-  -v, --verbose          same as --verbose=1 (default)
-  -vv,--very-verbose     same as --verbose=2
+  -v, --verbose          same as --verbose=2
+  -vv,--very-verbose     same as --verbose=3
   -v, --verbose=x        grade of verbosity
                           x=0: no output
                           x=1: default output
@@ -92,7 +93,7 @@ some examples:
 
   ren_ext ASD asd
     replaces _first_ occurrence of 'ASD' by 'asd' in all files, e.g.
-    fooASDASD.txt -> fooasdASD (use -g for replacing all occurrences)
+    fooASDASD.txt -> fooasdASD.txt (use -g for replacing all occurrences)
   
   ren_ext --examples
     shows more examples
@@ -100,52 +101,66 @@ some examples:
 =head1 EXAMPLES
 
 ren_ext
+
   displays help
 
 ren_ext 'ASD' 'sdf'
+
   replaces _first_ occurrence of "ASD" by "sdf" in all files, e.g.
-  fooASDASD.txt -> foosdfASD
+  fooASDASD.txt -> foosdfASD.txt
 
 ren_ext 'ASD' 'sdf' -g
+
   replaces all occurrence of 'ASD' by 'sdf' in all files, e.g.
-  fooASDASD.txt -> foosdfsdf
+  fooASDASD.txt -> foosdfsdf.txt
 
 ren_ext '(.)' '\u$1'
-  sets _first_ character to upper case
+
+  sets _first_ character to upper case.
 
 ren_ext '(.)' '\l$1' -g
-  sets all characters to lower case
+
+  sets all characters to lower case.
 
 ren_ext '[A-Z]' '[a-z]' -y
-  sets all latin characters to lower case
+
+  sets all latin characters to lower case.
 
 ren_ext '(\p{Cyrillic}+)' '\U$1' -drug
+
   uppercase all cyrillic letters of files and directories in this 
-  directory and all subdirectories
+  directory and all subdirectories.
 
 ren_ext '.*cd(\d+)/([^/]+)$' '$1$2' --path -r
+
   uses full path, i.e., renames ...cd01/title.ogg to
   ...cd01/01title.ogg and so on (no files will be moved to another
-  directory)
+  directory).
 
 ren_ext '(/d)(/d)' '$2$1' -gr
-  exchanges digits of numbers in all filenames recursively
+
+  exchanges digits of numbers in all filenames recursively.
 
 ren_ext '(error_log\.)\d+(\.gz)' '$1$y-$mon-$d$2' --mtime
+
   e.g. errog_log.10.gz -> error_log.2007-07-07.gz
 
 ren_ext -r -- -foo -bar
-  this will replace '-foo' by '-bar' recursively
+
+  this will replace '-foo' by '-bar' recursively.
 
 ren_ext 'foo(\d\d)' '"bar".($1+42)' -ert
+
   prints the result of replacing e.g. 'foo10' by 'bar52' recursively,
-  but doesn't really change filenames
+  but doesn't really change filenames.
 
 ren_ext 'xy' 'yx' --tr -F 'foo_x=\d+_y=\d+'
-  use tr/xy/yx/ on all files that match /foo_x=\d+_y=\d+/, i.e., 
-  switch the letters 'x' and 'y' in all of those files
 
-note that in windows you have to use double quotes instead of single quotes.
+  use tr/xy/yx/ on all files that match /foo_x=\d+_y=\d+/, i.e., 
+  switch the letters 'x' and 'y' in all of those files.
+
+note that in microsoft windows you have to use double quotes instead of single 
+quotes.
 
 =head1 OPTIONS
 
@@ -225,11 +240,11 @@ enable unicode support for input, output, and renaming
 
 =item B<--predictive>=I<bool>, B<-p> I<bool>
 
-first look for possible overwriting or not...
+look for possible overwriting first before renaming (or don't)...
 
-I<bool> = 0: rename, but skip files, which would be overwritten, but shouldn't (depends on B<--force>).
+I<bool> = 0: start renaming, but skip those files that would lead to overwriting another file that shouldn't be overwritten (depends on B<--force>).
 
-I<bool> = 1 (default): don't even start renaming, if files would be overwritten, that shouldn't (depends on B<--force>).
+I<bool> = 1 (default): don't even start renaming (of any file), if ther is at least one file that would be and shouldn't be overwritten (depends on B<--force>).
 
 =item B<--force>, B<-f>
 
@@ -255,7 +270,7 @@ maybe you should consider using B<--no-auto> if you use slashes in B<replaceRE>.
 
 don't combine this with parameter B<--tr>.
 
-=item B<--global>, B<-g>
+=item B<--global>, B<--gmodifier>, B<-g>
 
 set g-modifier, i.e., rename as many times as possible, i.e., 
 
@@ -263,7 +278,7 @@ set g-modifier, i.e., rename as many times as possible, i.e.,
 
 don't combine this with parameter B<--tr>.
 
-=item B<--ignorecase>, B<-i>
+=item B<--ignorecase>, B<--imodifier>, B<-i>
 
 set i-modifier, i.e., ignore case in B<findRE>, i.e., 
 
@@ -295,17 +310,19 @@ same as B<--verbose=0>.
 
 =item B<--very-verbose, -vv>
 
-same as B<--verbose=2>. you may use B<-vvv> for B<--verbose=3> a.s.o.
+same as B<--verbose=3>. you may use B<-vvv> for B<--verbose=4> a.s.o.
 
 =item B<--verbose, -v>
 
-same as B<--verbose=1>.
+same as B<--verbose=2>.
 
 =back
 
 =head1 LICENCE
 
-Copyright (c) 2014, seth
+BSD-2-Clause
+
+Copyright (c) 2014-2017, seth
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
