@@ -12,7 +12,7 @@ use Getopt::Long qw(:config bundling);
 use Pod::Usage;
 #use utf8;
 
-$main::VERSION = '1.31.0'; # 20171126
+$main::VERSION = '1.31.1'; # 20180429
 #binmode STDOUT, ":utf8";
 
 # functions
@@ -528,6 +528,11 @@ ren_ext 'xy' 'yx' --tr -F 'foo_x=\d+_y=\d+'
 
   use tr/xy/yx/ on all files that match /foo_x=\d+_y=\d+/, i.e., 
   switch the letters 'x' and 'y' in all of those files.
+
+ren_ext -e 'segment\K([0-9]+)(?=_)' 'sprintf("%03d", $1)'
+
+  add leading zeros on numbers with <3 digits, e.g., 
+  change parts like 'segment{number}_' to 'segment{number_with_leading_zero}_'.
 
 note that in microsoft windows you have to use double quotes instead of single 
 quotes.

@@ -21,8 +21,8 @@ ren_ext [options] findRE replaceRE
   -c, --capitalize       Capitalize Every Word
   -d, --directories      rename files and directories (default: files only)
   -D, --Directories      rename directories only (default: files only)
-  -m, --mtime            use $y, $mon, $d in replaceRE to insert modification
-                          time
+  -m, --mtime            use $y, $mon, $d, $h, $min, $s in replaceRE to insert
+                          modification time
       --path             while searching use full paths of files in findRE
                           (default: base filenames only)
                           for the sake of intuition this options automatically 
@@ -159,6 +159,11 @@ ren_ext 'xy' 'yx' --tr -F 'foo_x=\d+_y=\d+'
   use tr/xy/yx/ on all files that match /foo_x=\d+_y=\d+/, i.e., 
   switch the letters 'x' and 'y' in all of those files.
 
+ren_ext -e 'segment\K([0-9]+)(?=_)' 'sprintf("%03d", $1)'
+
+  add leading zeros on numbers with <3 digits, e.g., 
+  change parts like 'segment{number}_' to 'segment{number_with_leading_zero}_'.
+
 note that in microsoft windows you have to use double quotes instead of single 
 quotes.
 
@@ -194,7 +199,7 @@ restrict replacements to files given by regexp I<string> (default ".", i.e., all
 
 =item B<--mtime>, B<-m>
 
-use $y, $mon, $d in B<replaceRE> to insert modification time
+use $y, $mon, $d, $h, $min, $s in B<replaceRE> to insert file modification time
 
 =item B<--path>
 
