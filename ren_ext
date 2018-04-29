@@ -12,7 +12,7 @@ use Getopt::Long qw(:config bundling);
 use Pod::Usage;
 #use utf8;
 
-$main::VERSION = '1.30.0'; # 20170513
+$main::VERSION = '1.31.0'; # 20171126
 #binmode STDOUT, ":utf8";
 
 # functions
@@ -153,7 +153,10 @@ sub get_time_of_file{
 	my $year  = sprintf "%04u", $filetime[5]+1900;
 	my $month = sprintf "%02u", $filetime[4]+1;
 	my $day   = sprintf "%02u", $filetime[3];
-	return ($year, $month, $day);
+	my $hours = sprintf "%02u", $filetime[2];
+	my $min   = sprintf "%02u", $filetime[1];
+	my $sec   = sprintf "%02u", $filetime[0];
+	return ($year, $month, $day, $hours, $min, $sec);
 }
 
 sub decode_utf8{
@@ -232,7 +235,7 @@ sub rename_files_per_re{
 	my @renamed_entries;
 	my @dirs;
 	my $searchreplace_string = generate_searchreplace_string($params);
-	print "\n".'  '.$working_dir.'/'."\n" if $verbose>1;
+	print "\n" . '  ' . $working_dir . '/' . "\n" if $verbose > 1;
 	opendir(DIR, '.') or die $working_dir.": $!"; # read_dir and generate renaming_array
 	while($entry_filename = readdir DIR){         # loop over directory entries
 		next if $entry_filename eq '.' or $entry_filename eq '..';
@@ -245,15 +248,15 @@ sub rename_files_per_re{
 			$entry = $entry_filename;
 		}
 		if(($ren_dirs and -d $entry_filename or $ren_files and not -d $entry_filename) 
-			and $entry=~/$filesRE/ 
-			and ($tr or !$tr and $entry=~/$findRE/)
+			and $entry =~ /$filesRE/ 
+			and ($tr or !$tr and $entry =~ /$findRE/)
 		){ # if entry should be renamed
-			my ($y, $mon, $d) = get_time_of_file($entry_filename) if $mtime==1;
-			print "\n".'  '.$working_dir.'/'."\n" if $verbose==1 and @entries_to_rename==0;
+			my ($y, $mon, $d, $h, $min, $s) = get_time_of_file($entry_filename) if $mtime == 1;
+			print "\n".'  '.$working_dir.'/'."\n" if $verbose==1 and @entries_to_rename == 0;
 			$output = 'rename: "'.$entry_filename;
-			print "'$entry'=~$searchreplace_string\n" if $verbose>2;
+			print "'$entry' =~ $searchreplace_string\n" if $verbose > 2;
 			push(@entries_to_rename, $entry_filename);
-			eval('$entry =~ '.$searchreplace_string);   # generate new file name
+			eval('$entry =~ ' . $searchreplace_string);   # generate new file name
 			#$entry = substr $entry, length($`) if($fullpath && (!is_win() && -1<index($`, '/') || is_win() && -1<index($`, '\\')));
 			$entry = capitalize($entry) if $capitalize;
 			$output .= '" ==> "'.$entry;
@@ -388,8 +391,8 @@ ren_ext [options] findRE replaceRE
   -c, --capitalize       Capitalize Every Word
   -d, --directories      rename files and directories (default: files only)
   -D, --Directories      rename directories only (default: files only)
-  -m, --mtime            use $y, $mon, $d in replaceRE to insert modification
-                          time
+  -m, --mtime            use $y, $mon, $d, $h, $min, $s in replaceRE to insert
+                          modification time
       --path             while searching use full paths of files in findRE
                           (default: base filenames only)
                           for the sake of intuition this options automatically 
@@ -561,7 +564,7 @@ restrict replacements to files given by regexp I<string> (default ".", i.e., all
 
 =item B<--mtime>, B<-m>
 
-use $y, $mon, $d in B<replaceRE> to insert modification time
+use $y, $mon, $d, $h, $min, $s in B<replaceRE> to insert file modification time
 
 =item B<--path>
 
